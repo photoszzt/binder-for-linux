@@ -1,0 +1,6 @@
+serverCPU: 0
+clientCPU: 1
+iterations: 10000
+iterDelay: 0.001
+mode: performance test (payload size = 256 bytes)
+Time per iteration min: 1.0049e-05 avg: 4.09896e-05 max: 0.00375401
