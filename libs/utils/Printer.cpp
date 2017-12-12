@@ -21,8 +21,6 @@
 #include <utils/String8.h>
 #include <utils/Log.h>
 
-#include <string.h>
-#include <stdio.h>
 #include <stdlib.h>
 
 namespace android {
@@ -44,12 +42,14 @@ void Printer::printFormatLine(const char* format, ...) {
 
     char* formattedString;
 
-#ifndef USE_MINGW
+#ifndef _WIN32
     if (vasprintf(&formattedString, format, arglist) < 0) { // returns -1 on error
         ALOGE("%s: Failed to format string", __FUNCTION__);
+        va_end(arglist);
         return;
     }
 #else
+    va_end(arglist);
     return;
 #endif
 
@@ -88,7 +88,7 @@ void LogPrinter::printLine(const char* string) {
 }
 
 void LogPrinter::printRaw(const char* string) {
-    // __android_log_print(mPriority, mLogTag, "%s%s", mPrefix, string);
+    __android_log_print(mPriority, mLogTag, "%s%s", mPrefix, string);
 }
 
 
@@ -115,7 +115,7 @@ void FdPrinter::printLine(const char* string) {
         return;
     }
 
-#ifndef USE_MINGW
+#ifndef _WIN32
     dprintf(mFd, mFormatString, mPrefix, string);
 #endif
 }

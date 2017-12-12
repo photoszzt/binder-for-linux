@@ -17,10 +17,14 @@
 #define LOG_TAG "CallStack"
 
 #include <utils/CallStack.h>
+
+#include <memory>
+
 #include <utils/Printer.h>
 #include <utils/Errors.h>
 #include <utils/Log.h>
-#include <utils/UniquePtr.h>
+
+#include <backtrace/Backtrace.h>
 
 namespace android {
 
@@ -36,15 +40,15 @@ CallStack::~CallStack() {
 }
 
 void CallStack::update(int32_t ignoreDepth, pid_t tid) {
-    // mFrameLines.clear();
+    mFrameLines.clear();
 
-    // UniquePtr<Backtrace> backtrace(Backtrace::Create(BACKTRACE_CURRENT_PROCESS, tid));
-    // if (!backtrace->Unwind(ignoreDepth)) {
-    //     ALOGW("%s: Failed to unwind callstack.", __FUNCTION__);
-    // }
-    // for (size_t i = 0; i < backtrace->NumFrames(); i++) {
-    //   mFrameLines.push_back(String8(backtrace->FormatFrameData(i).c_str()));
-    // }
+    std::unique_ptr<Backtrace> backtrace(Backtrace::Create(BACKTRACE_CURRENT_PROCESS, tid));
+    if (!backtrace->Unwind(ignoreDepth)) {
+        ALOGW("%s: Failed to unwind callstack.", __FUNCTION__);
+    }
+    for (size_t i = 0; i < backtrace->NumFrames(); i++) {
+      mFrameLines.push_back(String8(backtrace->FormatFrameData(i).c_str()));
+    }
 }
 
 void CallStack::log(const char* logtag, android_LogPriority priority, const char* prefix) const {

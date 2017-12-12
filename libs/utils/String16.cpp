@@ -17,14 +17,10 @@
 #include <utils/String16.h>
 
 #include <utils/Log.h>
-#include <utils/Unicode.h>
-#include <utils/String8.h>
-#include <utils/threads.h>
 
-#include <memory.h>
-#include <stdio.h>
 #include <ctype.h>
 
+#include "SharedBuffer.h"
 
 namespace android {
 
@@ -71,12 +67,12 @@ static char16_t* allocFromUTF8(const char* u8str, size_t u8len)
         u8cur = (const uint8_t*) u8str;
         char16_t* u16str = (char16_t*)buf->data();
 
-        utf8_to_utf16(u8cur, u8len, u16str);
+        utf8_to_utf16(u8cur, u8len, u16str, ((size_t) u16len) + 1);
 
         //printf("Created UTF-16 string from UTF-8 \"%s\":", in);
         //printHexData(1, str, buf->size(), 16, 1);
         //printf("\n");
-        
+
         return u16str;
     }
 
@@ -126,7 +122,7 @@ String16::String16(const char16_t* o)
         mString = str;
         return;
     }
-    
+
     mString = getEmptyString();
 }
 
@@ -141,7 +137,7 @@ String16::String16(const char16_t* o, size_t len)
         mString = str;
         return;
     }
-    
+
     mString = getEmptyString();
 }
 
@@ -163,6 +159,11 @@ String16::String16(const char* o, size_t len)
 String16::~String16()
 {
     SharedBuffer::bufferFromData(mString)->release();
+}
+
+size_t String16::size() const
+{
+    return SharedBuffer::sizeFromData(mString)/sizeof(char16_t)-1;
 }
 
 void String16::setTo(const String16& other)
@@ -222,7 +223,7 @@ status_t String16::append(const String16& other)
     } else if (otherLen == 0) {
         return NO_ERROR;
     }
-    
+
     SharedBuffer* buf = SharedBuffer::bufferFromData(mString)
         ->editResize((myLen+otherLen+1)*sizeof(char16_t));
     if (buf) {
@@ -243,7 +244,7 @@ status_t String16::append(const char16_t* chrs, size_t otherLen)
     } else if (otherLen == 0) {
         return NO_ERROR;
     }
-    
+
     SharedBuffer* buf = SharedBuffer::bufferFromData(mString)
         ->editResize((myLen+otherLen+1)*sizeof(char16_t));
     if (buf) {
@@ -337,6 +338,11 @@ bool String16::startsWith(const char16_t* prefix) const
     const size_t ps = strlen16(prefix);
     if (ps > size()) return false;
     return strncmp16(mString, prefix, ps) == 0;
+}
+
+bool String16::contains(const char16_t* chrs) const
+{
+    return strstr16(mString, chrs) != nullptr;
 }
 
 status_t String16::makeLower()

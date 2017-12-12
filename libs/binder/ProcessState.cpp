@@ -16,8 +16,6 @@
 
 #define LOG_TAG "ProcessState"
 
-#include <cutils/process_name.h>
-
 #include <binder/ProcessState.h>
 
 #include <utils/Atomic.h>
@@ -40,19 +38,19 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 
-#define BINDER_VM_SIZE ((1*1024*1024) - (4096 *2))
+#define BINDER_VM_SIZE ((1 * 1024 * 1024) - sysconf(_SC_PAGE_SIZE) * 2)
 #define DEFAULT_MAX_BINDER_THREADS 15
 
-
-// ---------------------------------------------------------------------------
+// -------------------------------------------------------------------------
 
 namespace android {
 
 class PoolThread : public Thread
 {
 public:
-    PoolThread(bool isMain)
+    explicit PoolThread(bool isMain)
         : mIsMain(isMain)
     {
     }
@@ -73,7 +71,28 @@ sp<ProcessState> ProcessState::self()
     if (gProcess != NULL) {
         return gProcess;
     }
-    gProcess = new ProcessState;
+    gProcess = new ProcessState("/dev/binder");
+    return gProcess;
+}
+
+sp<ProcessState> ProcessState::initWithDriver(const char* driver)
+{
+    Mutex::Autolock _l(gProcessMutex);
+    if (gProcess != NULL) {
+        // Allow for initWithDriver to be called repeatedly with the same
+        // driver.
+        if (!strcmp(gProcess->getDriverName().c_str(), driver)) {
+            return gProcess;
+        }
+        LOG_ALWAYS_FATAL("ProcessState was already initialized.");
+    }
+    gProcess = new ProcessState(driver);
+    return gProcess;
+}
+
+sp<ProcessState> ProcessState::selfOrNull()
+{
+    Mutex::Autolock _l(gProcessMutex);
     return gProcess;
 }
 
@@ -161,6 +180,46 @@ bool ProcessState::becomeContextManager(context_check_func checkFunc, void* user
         }
     }
     return mManagesContexts;
+}
+
+// Get references to userspace objects held by the kernel binder driver
+// Writes up to count elements into buf, and returns the total number
+// of references the kernel has, which may be larger than count.
+// buf may be NULL if count is 0.  The pointers returned by this method
+// should only be used for debugging and not dereferenced, they may
+// already be invalid.
+ssize_t ProcessState::getKernelReferences(size_t buf_count, uintptr_t* buf)
+{
+    // TODO: remove these when they are defined by bionic's binder.h
+    struct binder_node_debug_info {
+        binder_uintptr_t ptr;
+        binder_uintptr_t cookie;
+        __u32 has_strong_ref;
+        __u32 has_weak_ref;
+    };
+#define BINDER_GET_NODE_DEBUG_INFO _IOWR('b', 11, struct binder_node_debug_info)
+
+    binder_node_debug_info info = {};
+
+    uintptr_t* end = buf ? buf + buf_count : NULL;
+    size_t count = 0;
+
+    do {
+        status_t result = ioctl(mDriverFD, BINDER_GET_NODE_DEBUG_INFO, &info);
+        if (result < 0) {
+            return -1;
+        }
+        if (info.ptr != 0) {
+            if (buf && buf < end)
+                *buf++ = info.ptr;
+            count++;
+            if (buf && buf < end)
+                *buf++ = info.cookie;
+            count++;
+        }
+    } while (info.ptr != 0);
+
+    return count;
 }
 
 ProcessState::handle_entry* ProcessState::lookupHandleLocked(int32_t handle)
@@ -278,8 +337,9 @@ void ProcessState::expungeHandle(int32_t handle, IBinder* binder)
 
 String8 ProcessState::makeBinderThreadName() {
     int32_t s = android_atomic_add(1, &mThreadPoolSeq);
+    pid_t pid = getpid();
     String8 name;
-    name.appendFormat("Binder_%X", s);
+    name.appendFormat("Binder:%d_%X", pid, s);
     return name;
 }
 
@@ -308,11 +368,14 @@ void ProcessState::giveThreadPoolName() {
     androidSetThreadName( makeBinderThreadName().string() );
 }
 
-static int open_driver()
+String8 ProcessState::getDriverName() {
+    return mDriverName;
+}
+
+static int open_driver(const char *driver)
 {
-    int fd = open("/dev/binder", O_RDWR);
+    int fd = open(driver, O_RDWR | O_CLOEXEC);
     if (fd >= 0) {
-        fcntl(fd, F_SETFD, FD_CLOEXEC);
         int vers = 0;
         status_t result = ioctl(fd, BINDER_VERSION, &vers);
         if (result == -1) {
@@ -321,7 +384,8 @@ static int open_driver()
             fd = -1;
         }
         if (result != 0 || vers != BINDER_CURRENT_PROTOCOL_VERSION) {
-            ALOGE("Binder driver protocol does not match user space protocol!");
+          ALOGE("Binder driver protocol(%d) does not match user space protocol(%d)! ioctl() return value: %d",
+                vers, BINDER_CURRENT_PROTOCOL_VERSION, result);
             close(fd);
             fd = -1;
         }
@@ -331,18 +395,20 @@ static int open_driver()
             ALOGE("Binder ioctl to set max threads failed: %s", strerror(errno));
         }
     } else {
-        ALOGW("Opening '/dev/binder' failed: %s\n", strerror(errno));
+        ALOGW("Opening '%s' failed: %s\n", driver, strerror(errno));
     }
     return fd;
 }
 
-ProcessState::ProcessState()
-    : mDriverFD(open_driver())
+ProcessState::ProcessState(const char *driver)
+    : mDriverName(String8(driver))
+    , mDriverFD(open_driver(driver))
     , mVMStart(MAP_FAILED)
     , mThreadCountLock(PTHREAD_MUTEX_INITIALIZER)
     , mThreadCountDecrement(PTHREAD_COND_INITIALIZER)
     , mExecutingThreadsCount(0)
     , mMaxThreads(DEFAULT_MAX_BINDER_THREADS)
+    , mStarvationStartTimeMs(0)
     , mManagesContexts(false)
     , mBinderContextCheckFunc(NULL)
     , mBinderContextUserData(NULL)
@@ -350,10 +416,6 @@ ProcessState::ProcessState()
     , mThreadPoolSeq(1)
 {
     if (mDriverFD >= 0) {
-        // XXX Ideally, there should be a specific define for whether we
-        // have mmap (or whether we could possibly have the kernel module
-        // availabla).
-#if !defined(HAVE_WIN32_IPC)
         // mmap the binder, providing a chunk of virtual address space to receive transactions.
         mVMStart = mmap(0, BINDER_VM_SIZE, PROT_READ, MAP_PRIVATE | MAP_NORESERVE, mDriverFD, 0);
         if (mVMStart == MAP_FAILED) {
@@ -361,10 +423,8 @@ ProcessState::ProcessState()
             ALOGE("Using /dev/binder failed: unable to mmap transaction memory.\n");
             close(mDriverFD);
             mDriverFD = -1;
+            mDriverName.clear();
         }
-#else
-        mDriverFD = -1;
-#endif
     }
 
     LOG_ALWAYS_FATAL_IF(mDriverFD < 0, "Binder driver could not be opened.  Terminating.");
@@ -372,6 +432,13 @@ ProcessState::ProcessState()
 
 ProcessState::~ProcessState()
 {
+    if (mDriverFD >= 0) {
+        if (mVMStart != MAP_FAILED) {
+            munmap(mVMStart, BINDER_VM_SIZE);
+        }
+        close(mDriverFD);
+    }
+    mDriverFD = -1;
 }
         
 }; // namespace android

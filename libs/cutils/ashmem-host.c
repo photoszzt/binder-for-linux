@@ -43,11 +43,16 @@ int ashmem_create_region(const char *ignored __unused, size_t size)
     char template[PATH_MAX];
     snprintf(template, sizeof(template), "/tmp/android-ashmem-%d-XXXXXXXXX", getpid());
     int fd = mkstemp(template);
-    if (fd != -1 && TEMP_FAILURE_RETRY(ftruncate(fd, size)) != -1 && unlink(template) != -1) {
-        return fd;
+    if (fd == -1) return -1;
+
+    unlink(template);
+
+    if (TEMP_FAILURE_RETRY(ftruncate(fd, size)) == -1) {
+      close(fd);
+      return -1;
     }
-    close(fd);
-    return -1;
+
+    return fd;
 }
 
 int ashmem_set_prot_region(int fd __unused, int prot __unused)
@@ -57,12 +62,12 @@ int ashmem_set_prot_region(int fd __unused, int prot __unused)
 
 int ashmem_pin_region(int fd __unused, size_t offset __unused, size_t len __unused)
 {
-    return ASHMEM_NOT_PURGED;
+    return 0 /*ASHMEM_NOT_PURGED*/;
 }
 
 int ashmem_unpin_region(int fd __unused, size_t offset __unused, size_t len __unused)
 {
-    return ASHMEM_IS_UNPINNED;
+    return 0 /*ASHMEM_IS_UNPINNED*/;
 }
 
 int ashmem_get_size_region(int fd)
@@ -73,8 +78,11 @@ int ashmem_get_size_region(int fd)
         return -1;
     }
 
-    // Check if this is an "ashmem" region.
-    // TODO: This is very hacky, and can easily break. We need some reliable indicator.
+    /*
+     * Check if this is an "ashmem" region.
+     * TODO: This is very hacky, and can easily break.
+     * We need some reliable indicator.
+     */
     if (!(buf.st_nlink == 0 && S_ISREG(buf.st_mode))) {
         errno = ENOTTY;
         return -1;

@@ -18,13 +18,12 @@
 #define ANDROID_PROCESS_CALLSTACK_H
 
 #include <utils/CallStack.h>
-#include <cutils/log.h>
+#include <android/log.h>
 #include <utils/KeyedVector.h>
 #include <utils/String8.h>
 
 #include <time.h>
 #include <sys/types.h>
-#include <unistd.h>
 
 namespace android {
 

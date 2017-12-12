@@ -83,6 +83,7 @@ public:
     // in to it but doesn't want to acquire locks in its services while in
     // the background.
     static  void                disableBackgroundScheduling(bool disable);
+            bool                backgroundSchedulingDisabled();
 
             // Call blocks until the number of executing binder threads is less than
             // the maximum number of binder threads threads allowed for this process.
@@ -115,7 +116,6 @@ private:
                                            void* cookie);
     
     const   sp<ProcessState>    mProcess;
-    const   pid_t               mMyThreadId;
             Vector<BBinder*>    mPendingStrongDerefs;
             Vector<RefBase::weakref_type*> mPendingWeakDerefs;
 

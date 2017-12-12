@@ -71,7 +71,7 @@ private:
 
     class Extras;
 
-    std::atomic<Extras *>   mExtras;
+    std::atomic<Extras*> mExtras;
             void*       mReserved0;
 };
 
@@ -80,7 +80,7 @@ private:
 class BpRefBase : public virtual RefBase
 {
 protected:
-                            BpRefBase(const sp<IBinder>& o);
+    explicit                BpRefBase(const sp<IBinder>& o);
     virtual                 ~BpRefBase();
     virtual void            onFirstRef();
     virtual void            onLastStrongRef(const void* id);
