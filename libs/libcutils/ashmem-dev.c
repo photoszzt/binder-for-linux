@@ -20,6 +20,7 @@
  * used by the simulator.
  */
 #define LOG_TAG "ashmem"
+#define _GNU_SOURCE
 
 #include <errno.h>
 #include <fcntl.h>
