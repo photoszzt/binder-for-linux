@@ -19,5 +19,5 @@ target_compile_definitions(log PRIVATE -DFAKE_LOG_DEVICE=1)
 
 target_include_directories(log PUBLIC include ../include)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -stdlib=libc++")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu11")

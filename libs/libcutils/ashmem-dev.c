@@ -23,7 +23,11 @@
 
 #include <errno.h>
 #include <fcntl.h>
-#include <linux/ashmem.h>
+
+typedef unsigned int __u32;
+
+//#include <linux/ashmem.h>
+#include <driver/ashmem/uapi_ashmem.h>
 #include <pthread.h>
 #include <string.h>
 #include <sys/ioctl.h>

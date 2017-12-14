@@ -22,5 +22,6 @@ add_library(utils
         )
 
 target_include_directories(utils PUBLIC include ../include)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++11")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++11 -stdlib=libc++")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu11")
+target_link_libraries(utils log)

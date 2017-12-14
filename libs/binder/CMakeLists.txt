@@ -35,6 +35,6 @@ add_library(binder
 
 target_include_directories(binder PUBLIC include ../include ../../)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -stdlib=libc++")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu11")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c11")
 
 add_subdirectory(tests)

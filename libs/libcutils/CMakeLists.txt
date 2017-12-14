@@ -1,4 +1,6 @@
 add_library(cutils
+    ashmem-dev.c
+    ashmem-host.c
     config_utils.c
     fs_config.cpp
     canned_fs_config.c
@@ -23,10 +25,9 @@ add_library(cutils
     socket_network_client_unix.c
     sockets_unix.cpp
     str_parms.c
-    ashmem-host.c
     trace-host.c
     )
 
-target_include_directories(cutils PUBLIC include ../include)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+target_include_directories(cutils PUBLIC include ../include ../../)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -stdlib=libc++")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu11")
