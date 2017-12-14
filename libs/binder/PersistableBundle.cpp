@@ -23,8 +23,7 @@
 
 #include <binder/IBinder.h>
 #include <binder/Parcel.h>
-// #include <log/log.h>
-#include <cutils/log.h>
+#include <log/log.h>
 #include <utils/Errors.h>
 
 using android::BAD_TYPE;

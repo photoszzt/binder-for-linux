@@ -28,8 +28,7 @@
 #include <binder/MemoryHeapBase.h>
 #include <cutils/ashmem.h>
 #include <cutils/atomic.h>
-// #include <log/log.h>
-#include <cutils/log.h>
+#include <log/log.h>
 
 namespace android {
 

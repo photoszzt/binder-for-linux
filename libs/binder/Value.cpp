@@ -24,8 +24,7 @@
 #include <binder/Parcel.h>
 #include <binder/Map.h>
 #include <private/binder/ParcelValTypes.h>
-// #include <log/log.h>
-#include <cutils/log.h>
+#include <log/log.h>
 #include <utils/Errors.h>
 
 using android::BAD_TYPE;
@@ -183,12 +182,10 @@ Value& Value::swap(Value &rhs)
 
 Value& Value::operator=(const Value& rhs)
 {
-    if (this != &rhs) {
-        delete mContent;
-        mContent = rhs.mContent
-            ? rhs.mContent->clone()
-            : NULL;
-    }
+    delete mContent;
+    mContent = rhs.mContent
+        ? rhs.mContent->clone()
+        : NULL;
     return *this;
 }
 

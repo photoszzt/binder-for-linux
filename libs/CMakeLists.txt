@@ -1,0 +1,4 @@
+add_subdirectory(binder)
+add_subdirectory(libcutils)
+add_subdirectory(libutils)
+add_subdirectory(liblog)
